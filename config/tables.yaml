@@ -59,6 +59,8 @@ tables:
     source_file: olist_geolocation_dataset.csv
     key_columns:
       - geolocation_zip_code_prefix
+      - geolocation_lat
+      - geolocation_lng
     description: "Geographic coordinates for zip code prefixes"
 
   - name: product_category_name_translation
