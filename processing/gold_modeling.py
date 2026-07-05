@@ -93,6 +93,22 @@ def process_gold_layer():
             F.first("geolocation_state").alias("state")
         ).withColumn("_updated_at", F.current_timestamp())
 
+        # DIM_DATES (Time Dimension)
+        dim_dates = spark.sql("""
+            SELECT 
+                CAST(date_col AS DATE) as date_sk,
+                date_col as full_date,
+                YEAR(date_col) as year,
+                MONTH(date_col) as month,
+                DAY(date_col) as day,
+                QUARTER(date_col) as quarter,
+                DAYOFWEEK(date_col) as day_of_week,
+                CASE WHEN DAYOFWEEK(date_col) IN (1, 7) THEN True ELSE False END as is_weekend
+            FROM (
+                SELECT explode(sequence(to_date('2016-01-01'), to_date('2019-12-31'), interval 1 day)) as date_col
+            )
+        """).withColumn("_updated_at", F.current_timestamp())
+
         # ==========================================
         # 3. BUILD FACT TABLES
         # ==========================================
@@ -114,7 +130,12 @@ def process_gold_layer():
         )
         
         fact_order_sales = df_items.join(
-            df_orders.select("order_id", "customer_id", "order_status", "order_purchase_timestamp", "year", "month"),
+            df_orders.select(
+                "order_id", "customer_id", "order_status", 
+                "order_purchase_timestamp", "order_approved_at",
+                "order_delivered_customer_date", "order_estimated_delivery_date",
+                "year", "month"
+            ),
             on="order_id",
             how="inner"
         ).join(
@@ -146,6 +167,7 @@ def process_gold_layer():
         write_gold_table(dim_sellers, "dim_sellers")
         write_gold_table(dim_products, "dim_products")
         write_gold_table(dim_geolocation, "dim_geolocation")
+        write_gold_table(dim_dates, "dim_dates")
         
         # Write Facts (Partitioned)
         write_gold_table(fact_order_payments, "fact_order_payments", partition_cols=["year", "month"])
