@@ -2,7 +2,7 @@
 Data Quality Engine
 
 Implements the data quality checks for the Big Data Pipeline.
-Validates schemas, checks for nulls in critical columns, identifies duplicates,
+Checks for nulls in critical columns, identifies duplicates,
 and routes rejected records to a Dead Letter Queue (DLQ) Iceberg table.
 """
 

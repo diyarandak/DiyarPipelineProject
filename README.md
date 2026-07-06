@@ -2,7 +2,7 @@
 
 Olist Brazilian E-Commerce veri seti (~100,000 gerçek sipariş, 2016–2018) üzerine kurulu uçtan uca Big Data analytics pipeline'ı.
 
-> **Phase 1** of the BigData Pipeline Project — Ingest, Transform & Visualize.
+> Uçtan uca Big Data Pipeline — Ingest, Transform & Visualize.
 
 ---
 
@@ -72,45 +72,45 @@ Bu proje, Olist e-ticaret veri setini modern veri mühendisliği prensipleriyle 
 ### Gold Layer (İş Modeli — Star Schema)
 - Silver katmandan okunan veri **Kimball Star Schema** modeline dönüştürülür
 - Fact ve Dimension tabloları oluşturulur
-- Surrogate key'ler SHA2 hash ile üretilir
-- SCD Type 1 mantığı uygulanır
+- Partition stratejisi (year/month) ile sorgu performansı optimize edilir
 
 ---
 
 ## ⭐ Star Schema Tasarımı (Kimball)
 
-```
+```text
                           dim_customers
-                        (customer_sk, customer_id,
-                         city, state, zip_code)
+                        (customer_id, zip_code,
+                         city, state)
                                │
                                │
-dim_products ────────── fact_order_items ────────── dim_sellers
-(product_sk,            (order_item_sk,             (seller_sk,
- product_id,             order_id,                   seller_id,
- category,               customer_sk,                city, state)
- weight, size)           product_sk,
-                         seller_sk,                         │
-       │                 date_sk,                           │
-       │                 price,                    dim_geography
-       │                 freight_value,            (geo_sk,
-dim_dates                payment_value,             zip_code,
-(date_sk,                review_score)              lat, lng,
- full_date,                                         city, state)
- year, month,
- day, quarter,
- day_of_week,
- is_weekend)
+dim_products ────────── fact_order_sales ────────── dim_sellers
+(product_id,            (order_id,                  (seller_id,
+ category,               customer_id,                zip_code,
+ weight, size)           product_id,                 city, state)
+                         seller_id,                         
+       │                 order_purchase_timestamp,          │
+       │                 price,                    dim_geolocation
+       │                 freight_value,            (zip_code,
+dim_dates                avg_review_score)          lat, lng,
+(full_date,                                         city, state)
+ year, month,           fact_order_payments
+ day, quarter,          (order_id,
+ day_of_week,            customer_id,
+ is_weekend)             payment_type,
+                         payment_installments,
+                         payment_value)
 ```
 
 | Tablo | Tip | Grain | Açıklama |
 |-------|-----|-------|----------|
-| `fact_order_items` | Fact | 1 sipariş kalemi | Sipariş, ödeme ve review birleşimi |
-| `dim_customers` | Dimension | 1 müşteri | Müşteri bilgileri (SCD Type 1) |
-| `dim_products` | Dimension | 1 ürün | Ürün bilgileri + kategori çevirisi |
-| `dim_sellers` | Dimension | 1 satıcı | Satıcı konum bilgileri |
-| `dim_dates` | Dimension | 1 gün | Tarih boyutu (2016–2018) |
-| `dim_geography` | Dimension | 1 lokasyon | Coğrafi konum (deduplicated) |
+| `fact_order_sales` | Fact | 1 sipariş kalemi | Sipariş detayları, fiyatlar ve ort. yorum puanı |
+| `fact_order_payments`| Fact | 1 ödeme taksiti| Sipariş ödeme tipleri ve taksit tutarları |
+| `dim_customers` | Dimension | 1 müşteri | Müşteri ID ve lokasyon bilgileri |
+| `dim_products` | Dimension | 1 ürün | Ürün bilgileri ve İngilizce kategori çevirisi |
+| `dim_sellers` | Dimension | 1 satıcı | Satıcı ID ve lokasyon bilgileri |
+| `dim_dates` | Dimension | 1 gün | Zaman boyutu (2016–2018) |
+| `dim_geolocation` | Dimension | 1 zip code | Coğrafi koordinatlar (deduplicated) |
 
 ---
 
@@ -178,8 +178,8 @@ docker compose -f docker/docker-compose-airflow.yml up -d
 ### 3. Pipeline'ı Çalıştır
 
 **Yöntem A — Airflow üzerinden (önerilen):**
-1. [http://localhost:8082](http://localhost:8082) → Airflow UI
-2. `olist_data_pipeline` DAG'ını tetikle
+1. [http://localhost:8080](http://localhost:8080) → Airflow UI
+2. `olist_medallion_pipeline` DAG'ını tetikle
 
 **Yöntem B — Manuel (Makefile):**
 ```bash
@@ -211,7 +211,7 @@ spark-submit visualization/register_tables.py
 | Spark Master | http://localhost:8080 | — |
 | Spark UI | http://localhost:4040 | — |
 | Superset | http://localhost:8088 | admin / admin |
-| Airflow | http://localhost:8082 | airflow / airflow |
+| Airflow | http://localhost:8080 | admin / admin |
 
 ---
 
@@ -219,11 +219,13 @@ spark-submit visualization/register_tables.py
 
 ```
 BigData-Pipeline-Project/
+├── main.py                    # Projeyi başlatan Master Controller
 ├── config/
 │   ├── tables.yaml                # Tablo konfigürasyonları
 │   └── pipeline_config.yaml       # Pipeline ayarları
-├── dags/
-│   └── olist_pipeline_dag.py      # Airflow DAG tanımı
+├── airflow/
+│   └── dags/
+│       └── olist_pipeline_dag.py  # Airflow DAG tanımı
 ├── docker/
 │   ├── docker-compose-hdfs.yml    # HDFS (NameNode + DataNode)
 │   ├── docker-compose-spark.yml   # Spark + Iceberg + ThriftServer
@@ -232,7 +234,6 @@ BigData-Pipeline-Project/
 │   ├── docker-compose-minio.yml   # MinIO (alternatif depolama)
 │   └── docker-compose-dev.yml     # Geliştirme ortamı
 ├── processing/
-│   ├── analysis.py                # Ana giriş noktası
 │   ├── bronze_ingestion.py        # CSV → Bronze (Iceberg)
 │   ├── silver_transformation.py   # Bronze → Silver (temizleme)
 │   ├── gold_modeling.py           # Silver → Gold (Star Schema)
@@ -273,17 +274,7 @@ BigData-Pipeline-Project/
 | 8 | `olist_geolocation_dataset` | Coğrafi koordinatlar |
 | 9 | `product_category_name_translation` | Kategori isim çevirileri |
 
----
 
-## 🔮 Gelecek Fazlar İçin Yol Haritası
-
-| Faz | Planlanan Geliştirmeler |
-|-----|------------------------|
-| **Phase 2** | Apache Kafka ile real-time event streaming, Debezium CDC |
-| **Phase 3** | Apache Doris/Starrocks OLAP engine, sub-second analytics |
-| **Phase 4** | Tam Lakehouse mimarisi — Iceberg + Kafka + Doris + dbt |
-
----
 
 ## 🏗️ Mimari Kararlar
 

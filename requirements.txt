@@ -7,7 +7,7 @@ pyspark==3.3.0
 pyyaml>=6.0
 
 # Data quality & validation
-pydantic>=2.0
+# (PySpark's built-in functions are used for null/duplicate checks)
 
 # Kaggle dataset download
 kaggle>=1.6.0

@@ -1,84 +1,25 @@
-# 📋 Olist Big Data Pipeline — Proje Raporu
+# Olist Big Data Pipeline - Proje Mimari ve Sonuç Raporu
 
 ## 1. Proje Özeti
+Bu proje, Brezilya merkezli Olist e-ticaret platformunun ~100.000 gerçek sipariş verisini modern veri mühendisliği teknikleriyle işleyen uçtan uca bir Büyük Veri (Big Data) hattı projesidir. Veriler "Medallion Mimarisi" (Bronze -> Silver -> Gold) prensiplerine sadık kalınarak işlenmiş, temizlenmiş ve İş Zekası (BI) raporlamalarına hazır hale getirilmiştir.
 
-Bu rapor, Olist Brazilian E-Commerce veri seti üzerinde kurulan uçtan uca Big Data analytics pipeline'ının tasarım kararlarını, uygulama detaylarını ve sonuçlarını içermektedir.
+## 2. Kullanılan Teknolojiler ve Mimari
+- **Veri Kaynağı:** Kaggle API (Olist Dataset - 9 Adet CSV)
+- **Veri İşleme Motoru:** Apache Spark (PySpark)
+- **Tablo Formatı ve Depolama:** Apache Iceberg (HDFS/Docker üzerinde)
+- **Veri Kalitesi (Data Quality):** PySpark (Tekrar eden veri ve Null kontrolü) ve Pytest
+- **Orkestrasyon:** Apache Airflow
+- **İş Zekası (BI) ve Görselleştirme:** Apache Superset
 
-**Temel hedefler:**
-- 9 CSV tablosunun Medallion Mimarisi (Bronze/Silver/Gold) ile işlenmesi
-- Apache Iceberg table format ile modern data lakehouse yaklaşımının uygulanması
-- Kimball Star Schema ile analitik modelleme
-- Apache Airflow ile pipeline orkestrasyonu
-- Apache Superset ile görselleştirme
-
----
-
-## 2. Mimari Tasarım
-
-### 2.1 Medallion Mimarisi (Bronze / Silver / Gold)
-
-_Bu bölüm pipeline geliştirildikçe güncellenecektir._
-
-### 2.2 Apache Iceberg Tercih Gerekçesi
-
-_Iceberg vs Hudi vs Delta Lake karşılaştırması eklenecektir._
-
-### 2.3 Star Schema (Kimball) Tasarımı
-
-_Fact ve Dimension tablo tasarımları eklenecektir._
-
----
-
-## 3. Veri Kalitesi
-
-### 3.1 Kalite Kontrol Sonuçları
-
-_Her tablo için null oranı, duplicate sayısı ve kalite metrikleri eklenecektir._
-
-### 3.2 Dead Letter Queue (DLQ)
-
-_Hatalı kayıtların analizi eklenecektir._
-
----
+## 3. Veri Katmanları (Medallion Mimarisi)
+- **Bronze Katman (Ham Veri):** Kaggle üzerinden indirilen CSV dosyaları, hiçbir manipülasyona veya veri kaybına uğramadan orijinal formatında (raw) Iceberg tabloları olarak depolanmıştır.
+- **Silver Katman (Temizlenmiş Veri):** Bronze katmandan alınan veriler üzerinde deduplication (tekrar eden verilerin silinmesi), veri tipi dönüşümleri (örneğin string tarihlerin timestamp'e çevrilmesi) ve null değer temizliği yapılmıştır. İhtiyaç duyulmayan sütunlar bu aşamada elenmiştir.
+- **Gold Katman (İş Modeli - Star Schema):** Temizlenmiş Silver veriler, analitik sorgular için en verimli yapı olan Kimball Star Schema modeline dönüştürülmüştür. 
+  - **Fact Tabloları:** `fact_order_sales` ve `fact_order_payments` adında 2 ana süreç tablosu oluşturulmuştur.
+  - **Dimension Tabloları:** `dim_customers`, `dim_sellers`, `dim_products`, `dim_geolocation`, `dim_dates` boyut tabloları ile model desteklenmiştir.
 
 ## 4. Pipeline Orkestrasyonu (Airflow)
+Tüm süreç Apache Airflow kullanılarak otomatikleştirilmiştir. Yazılan Airflow DAG (Yönlü Döngüsüz Grafik) sayesinde Bronze, Silver ve Gold süreçleri sırasıyla ve birbirine bağımlı olarak çalıştırılmış, oluşabilecek hatalara karşı retry (yeniden deneme) mekanizmaları kurgulanmıştır.
 
-_Airflow DAG yapısı ve çalışma detayları eklenecektir._
-
----
-
-## 5. Dashboard & Görselleştirme
-
-_Superset dashboard ekran görüntüleri ve grafik açıklamaları eklenecektir._
-
----
-
-## 6. Performans Metrikleri
-
-| Metrik | Değer |
-|--------|-------|
-| Toplam CSV satır sayısı | _TBD_ |
-| Bronze ingestion süresi | _TBD_ |
-| Silver transformation süresi | _TBD_ |
-| Gold modeling süresi | _TBD_ |
-| Toplam pipeline süresi | _TBD_ |
-
----
-
-## 7. Karşılaşılan Sorunlar ve Çözümler
-
-_Geliştirme sürecinde karşılaşılan sorunlar ve çözümleri eklenecektir._
-
----
-
-## 8. Gelecek Fazlar İçin Öneriler
-
-- **Phase 2:** Apache Kafka ile real-time event streaming, Debezium CDC
-- **Phase 3:** Apache Doris/Starrocks OLAP engine entegrasyonu
-- **Phase 4:** Tam Lakehouse mimarisi — Iceberg + Kafka + Doris + dbt
-
----
-
-## 9. Sonuç
-
-_Proje tamamlandığında genel değerlendirme eklenecektir._
+## 5. Veri Kalitesi ve Standartlar
+Kod tabanında tutarlılığı sağlamak amacıyla **Pre-commit hook** (Black, Flake8) yapıları kurulmuştur. Veri hatlarındaki (pipeline) hatalı, eksik (Null) veya tekrar eden kayıtları saptayıp DLQ (Dead Letter Queue) tablolarına yönlendiren PySpark fonksiyonları yazılmış, bunların doğruluğu **Pytest** üzerinden otomatize test edilmiştir. Ayrıca, projenin lokal ortamda baştan uca tek tuşla test edilebilmesi için `main.py` (Master Controller) mekanizması eklenmiştir.

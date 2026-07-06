@@ -54,7 +54,7 @@ pipeline: bronze silver gold
 
 dashboard:
 	@echo "📊 Registering tables in Superset..."
-	docker exec olist-dev spark-submit --packages org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3 visualization/register_tables.py
+	docker exec olist-dev python visualization/register_tables.py
 
 all: setup download pipeline dashboard
 	@echo "🎉 Everything is ready! Open http://localhost:8088 for Superset."
