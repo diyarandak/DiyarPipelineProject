@@ -16,6 +16,9 @@
 
 .PHONY: setup download bronze silver gold pipeline dashboard all stop clean test lint
 
+# --- Variables ---
+ICEBERG_PACKAGE ?= org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3
+
 # --- Infrastructure ---
 setup:
 	@echo "🔧 Creating Docker network..."
@@ -39,15 +42,15 @@ download:
 
 bronze:
 	@echo "🟤 Running Bronze ingestion..."
-	docker exec olist-dev spark-submit --packages org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3 processing/bronze_ingestion.py
+	docker exec olist-dev spark-submit --packages $(ICEBERG_PACKAGE) processing/bronze_ingestion.py
 
 silver:
 	@echo "⚪ Running Silver transformation..."
-	docker exec olist-dev spark-submit --packages org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3 processing/silver_transformation.py
+	docker exec olist-dev spark-submit --packages $(ICEBERG_PACKAGE) processing/silver_transformation.py
 
 gold:
 	@echo "⭐ Running Gold modeling..."
-	docker exec olist-dev spark-submit --packages org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3 processing/gold_modeling.py
+	docker exec olist-dev spark-submit --packages $(ICEBERG_PACKAGE) processing/gold_modeling.py
 
 pipeline: bronze silver gold
 	@echo "✅ Full pipeline complete!"

@@ -38,7 +38,7 @@ def main():
             "database": db_id,
             "schema": "gold",
             "table_name": "Master_Sales_Auto",
-            "sql": "SELECT f.order_id, f.customer_id, f.order_status, f.order_purchase_timestamp, f.order_delivered_customer_date, f.order_estimated_delivery_date, f.price, f.freight_value, f.avg_review_score, c.customer_city, c.customer_state, p.product_category_name, s.seller_city, s.seller_state, geo.avg_latitude as customer_lat, geo.avg_longitude as customer_lon FROM fact_order_sales f LEFT JOIN dim_customers c ON f.customer_id = c.customer_id LEFT JOIN dim_products p ON f.product_id = p.product_id LEFT JOIN dim_sellers s ON f.seller_id = s.seller_id LEFT JOIN dim_geolocation geo ON c.customer_zip_code_prefix = geo.geolocation_zip_code_prefix"
+            "sql": "SELECT f.order_id, f.customer_id, c.customer_unique_id, f.order_status, f.order_purchase_timestamp, f.order_delivered_customer_date, f.order_estimated_delivery_date, f.price, f.freight_value, f.avg_review_score, c.customer_city, c.customer_state, p.product_category_name, s.seller_city, s.seller_state, geo.avg_latitude as customer_lat, geo.avg_longitude as customer_lon FROM fact_order_sales f LEFT JOIN dim_customers c ON f.customer_id = c.customer_id LEFT JOIN dim_products p ON f.product_id = p.product_id LEFT JOIN dim_sellers s ON f.seller_id = s.seller_id LEFT JOIN dim_geolocation geo ON c.customer_zip_code_prefix = geo.geolocation_zip_code_prefix"
         },
         "Master_Payments_Auto": {
             "database": db_id,
@@ -109,12 +109,12 @@ def main():
             "datasource_id": sales_id,
             "datasource_type": "table",
             "params": json.dumps({
+                "x_axis": "product_category_name",
                 "metrics": [{
                     "expressionType": "SQL",
                     "sqlExpression": "SUM(price)",
                     "label": "Ciro"
                 }],
-                "groupby": ["product_category_name"],
                 "orientation": "horizontal",
                 "sort_series_type": "sum",
                 "sort_series_ascending": False,
@@ -127,12 +127,12 @@ def main():
             "datasource_id": sales_id,
             "datasource_type": "table",
             "params": json.dumps({
+                "x_axis": "customer_state",
                 "metrics": [{
                     "expressionType": "SQL",
                     "sqlExpression": "AVG(freight_value)",
                     "label": "Ortalama Kargo"
                 }],
-                "groupby": ["customer_state"],
                 "orientation": "vertical",
                 "sort_series_type": "sum",
                 "sort_series_ascending": False,

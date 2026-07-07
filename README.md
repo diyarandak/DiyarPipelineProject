@@ -1,6 +1,6 @@
 # 🛒 Olist E-Ticaret Veri Mühendisliği ve Analitik Platformu
 
-![Olist Dashboard](assets/screenshots/dashboard_1.png)
+![Olist Dashboard](assets/screenshots/superset_dashboard_1.png)
 
 ## 📌 Proje Özeti
 Bu proje, Brezilya'nın en büyük e-ticaret platformlarından biri olan **Olist** veri seti kullanılarak sıfırdan inşa edilmiş, uçtan uca (end-to-end) bir **Veri Mühendisliği ve İş Zekası (BI)** platformudur. 
@@ -15,12 +15,12 @@ Modern bir Data Lakehouse mimarisi kurmak için aşağıdaki teknolojiler entegr
 
 - **Orkestrasyon ve Zamanlama:** Apache Airflow
 - **Veri İşleme Motoru:** Apache Spark (PySpark)
-- **Veri Formatı ve Depolama:** Apache Iceberg + Hadoop (HDFS) / MinIO
+- **Veri Formatı ve Depolama:** Apache Iceberg + Hadoop (HDFS)
 - **İş Zekası ve Görselleştirme:** Apache Superset
 - **Konteyner Mimarisi:** Docker & Docker Compose
 - **Veri Modelleme:** Kimball Boyutsal Modelleme (Yıldız Şema - Star Schema)
 
-![Mimari Akış](assets/screenshots/dashboard_2.png)
+![Mimari Akış](assets/screenshots/superset_dashboard_2.png)
 
 ---
 
@@ -49,6 +49,90 @@ Bu proje sadece kod yazmaktan ibaret değil, sıfırdan ölçeklenebilir bir ver
 
 ---
 
+## 🌟 Star Schema (Yıldız Şema) Veri Modeli
+
+Gold katmanında analitik sorguları hızlandırmak ve Superset ile görselleştirmeyi kolaylaştırmak için aşağıdaki **Yıldız Şema** veri modeli tasarlanmıştır:
+
+```mermaid
+erDiagram
+    FACT_ORDER_SALES {
+        string order_id
+        string customer_id
+        string order_status
+        timestamp order_purchase_timestamp
+        int year
+        int month
+        float price
+        float freight_value
+        float avg_review_score
+    }
+    
+    FACT_ORDER_PAYMENTS {
+        string order_id
+        string customer_id
+        int payment_sequential
+        string payment_type
+        int payment_installments
+        float payment_value
+        int year
+        int month
+    }
+    
+    DIM_CUSTOMERS {
+        string customer_id
+        string customer_unique_id
+        string customer_zip_code_prefix
+        string customer_city
+        string customer_state
+    }
+    
+    DIM_PRODUCTS {
+        string product_id
+        string product_category_name
+        float product_weight_g
+        float product_length_cm
+        float product_height_cm
+        float product_width_cm
+    }
+    
+    DIM_SELLERS {
+        string seller_id
+        string seller_zip_code_prefix
+        string seller_city
+        string seller_state
+    }
+    
+    DIM_DATES {
+        date date_sk
+        int year
+        int month
+        int day
+        int quarter
+        boolean is_weekend
+    }
+
+    DIM_GEOLOCATION {
+        string geolocation_zip_code_prefix
+        float avg_latitude
+        float avg_longitude
+        string city
+        string state
+    }
+
+    FACT_ORDER_SALES }o--|| DIM_CUSTOMERS : "customer_id"
+    FACT_ORDER_SALES }o--|| DIM_PRODUCTS : "product_id"
+    FACT_ORDER_SALES }o--|| DIM_SELLERS : "seller_id"
+    FACT_ORDER_SALES }o--|| DIM_DATES : "order_purchase_timestamp = date_sk"
+    
+    FACT_ORDER_PAYMENTS }o--|| DIM_CUSTOMERS : "customer_id"
+    FACT_ORDER_PAYMENTS }o--|| DIM_DATES : "order_purchase_timestamp = date_sk"
+    
+    DIM_CUSTOMERS }o--|| DIM_GEOLOCATION : "customer_zip_code_prefix = geolocation_zip_code_prefix"
+    DIM_SELLERS }o--|| DIM_GEOLOCATION : "seller_zip_code_prefix = geolocation_zip_code_prefix"
+```
+
+---
+
 ## 📁 Proje Klasör Yapısı (Directory Structure)
 
 Proje, temiz kod ve modüler mimari prensiplerine göre aşağıdaki gibi organize edilmiştir:
@@ -59,7 +143,7 @@ Proje, temiz kod ve modüler mimari prensiplerine göre aşağıdaki gibi organi
  ┃ ┗ 📂 dags          
  ┃   ┗ 📜 olist_pipeline_dag.py
  ┣ 📂 assets           # Proje içindeki statik dosyalar ve görseller
- ┃ ┗ 📂 screenshots    # Superset'ten alınan detaylı Dashboard ekran görüntüleri (dashboard_1.png vb.)
+ ┃ ┗ 📂 screenshots    # Superset'ten alınan detaylı Dashboard ekran görüntüleri (superset_dashboard_1.png vb.)
  ┣ 📂 config           # Veritabanı, bucket ve pipeline konfigürasyon dosyaları (YAML formatında)
  ┣ 📂 docker           # Her bir servis (HDFS, Spark, Superset vb.) için ayrı ayrı docker-compose yapılandırmaları
  ┣ 📂 processing       # PySpark veri işleme kodlarının kalbi
@@ -84,13 +168,13 @@ Proje, temiz kod ve modüler mimari prensiplerine göre aşağıdaki gibi organi
 Superset üzerinde, yöneticilere gerçek zamanlı karar alma yeteneği sunan veri panolarımız:
 
 - **Eyaletlere Göre Lojistik Analizi & Kategori Ciro Dağılımı:**
-![Dashboard Preview](assets/screenshots/dashboard_3.png)
+![Dashboard Preview](assets/screenshots/superset_dashboard_3.png)
 
 - **Aylık Ciro Trendleri:**
-![Dashboard Preview](assets/screenshots/dashboard_4.png)
+![Dashboard Preview](assets/screenshots/superset_dashboard_4.png)
 
 - **Teslimat Başarı Oranları ve Sipariş Durumları:**
-![Dashboard Preview](assets/screenshots/dashboard_5.png)
+![Dashboard Preview](assets/screenshots/superset_dashboard_5.png)
 
 *(Daha detaylı mimari analiz ve iş odaklı kararlar için `reports/REPORT.md` dosyasını inceleyebilirsiniz.)*
 
@@ -102,8 +186,8 @@ Bu projeyi yerel ortamınızda (Localhost) tam kapsamlı olarak çalıştırmak 
 
 1. **Projeyi Klonlayın:**
    ```bash
-   git clone https://github.com/KULLANICI_ADIN/olist-bigdata-pipeline.git
-   cd olist-bigdata-pipeline
+   git clone https://github.com/diyarandak/DiyarPipelineProject.git
+   cd DiyarPipelineProject
    ```
 
 2. **Sistemleri Ayağa Kaldırın:**
@@ -126,7 +210,4 @@ Bu projeyi yerel ortamınızda (Localhost) tam kapsamlı olarak çalıştırmak 
 
 ---
 
-## 📈 Gelecek Geliştirmeler (Future Enhancements)
-- Apache Kafka kullanılarak gerçek zamanlı (Real-time) veri akışı (Streaming) entegrasyonu.
-- Mimariyi AWS EMR veya Google Dataproc gibi bulut (Cloud) sistemlerine taşıma.
-- Müşteri teslimat sürelerini ve kargo gecikmelerini tahmin etmek için Makine Öğrenmesi (ML) modellerinin entegrasyonu.
+

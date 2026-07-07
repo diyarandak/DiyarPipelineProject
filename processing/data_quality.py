@@ -59,6 +59,7 @@ def write_to_dlq(invalid_df: DataFrame, table_name: str, reason: str, catalog_na
         if reject_count == 0:
             return
             
+        invalid_df.cache()
         logger.warning(f"Routing {reject_count} rejected records to DLQ for {table_name}. Reason: {reason}")
         
         # Add metadata for auditing

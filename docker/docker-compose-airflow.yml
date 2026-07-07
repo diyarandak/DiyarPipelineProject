@@ -2,7 +2,10 @@ version: '3.8'
 
 x-airflow-common:
   &airflow-common
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:2.7.1}
+  build:
+    context: .
+    dockerfile: Dockerfile.airflow
+  image: olist-airflow-custom:latest
   environment:
     &airflow-common-env
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -11,6 +14,7 @@ x-airflow-common:
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    ICEBERG_PACKAGE: ${ICEBERG_PACKAGE:-org.apache.iceberg:iceberg-spark-runtime-3.3_2.12:1.4.3}
   volumes:
     - ../airflow/dags:/opt/airflow/dags
     - ../airflow/logs:/opt/airflow/logs

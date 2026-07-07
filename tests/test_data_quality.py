@@ -3,12 +3,20 @@ import os
 import sys
 import typing
 sys.modules['typing.io'] = typing
+
 from pyspark.sql import SparkSession
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from processing.data_quality import check_nulls, check_duplicates
+
+# PySpark 3.3.x uses an older cloudpickle version that fails on Python 3.11+
+# We skip the test gracefully locally if Python version is >= 3.11
+pytestmark = pytest.mark.skipif(
+    sys.version_info >= (3, 11),
+    reason="PySpark 3.3.x cloudpickle is incompatible with Python 3.11+. Run tests via 'make test' inside Docker."
+)
 
 # 1. BÖLÜM: SPARK SESSION (TEST MOTORU) KURULUMU
 @pytest.fixture(scope="session")

@@ -24,3 +24,6 @@ _SUCCESS
 
 # Logs
 *.log
+reports/watermark.json
+implementation_plan.md
+task.md

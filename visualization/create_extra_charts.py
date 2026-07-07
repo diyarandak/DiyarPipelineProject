@@ -54,7 +54,7 @@ def main():
             "params": json.dumps({
                 "metric": {
                     "expressionType": "SQL",
-                    "sqlExpression": "COUNT(DISTINCT customer_id)",
+                    "sqlExpression": "COUNT(DISTINCT customer_unique_id)",
                     "label": "Toplam Müşteri"
                 }
             })
@@ -86,7 +86,7 @@ def main():
                 "groupby": ["order_status"],
                 "metric": {
                     "expressionType": "SQL",
-                    "sqlExpression": "COUNT(order_id)",
+                    "sqlExpression": "COUNT(DISTINCT order_id)",
                     "label": "Sipariş Adedi"
                 },
                 "innerRadius": 40, # Make it a donut chart

@@ -43,8 +43,7 @@ java_options = (
     "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
     "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
     "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
-    "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED "
-    "-Djava.security.manager=allow"
+    "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED"
 )
 os.environ["PYSPARK_SUBMIT_ARGS"] = f"--driver-java-options '{java_options}' pyspark-shell"
 
@@ -160,8 +159,8 @@ def create_spark_session(config: dict = None, app_name: str = None):
     master = spark_config.get("master", "local[*]")
 
     # Fix for Java 17+ (DirectByteBuffer memory issues)
+    # Java security manager flag removed for Java 11 compatibility
     java_options = (
-        "-Djava.security.manager=allow "
         "--add-opens=java.base/java.lang=ALL-UNNAMED "
         "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
         "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "

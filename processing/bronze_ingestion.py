@@ -91,7 +91,7 @@ def process_bronze_layer():
             # Iceberg write command
             df.write \
                 .format("iceberg") \
-                .mode("overwrite") \
+                .mode("append") \
                 .saveAsTable(target_table)
             
             # 5. Save Watermark (from our utils.py)
