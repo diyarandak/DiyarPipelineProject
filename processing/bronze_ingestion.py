@@ -11,9 +11,6 @@ Performs minimal transformations:
 import sys
 import re
 from pathlib import Path
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -24,6 +21,9 @@ from processing.utils import (
     create_spark_session,
     save_watermark
 )
+
+import pyspark.sql.functions as F
+from pyspark.sql import DataFrame
 
 logger = setup_logger("BronzeIngestion")
 

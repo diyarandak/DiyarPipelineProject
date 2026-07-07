@@ -12,11 +12,41 @@ import json
 import logging
 import os
 import sys
+import typing
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
+# Monkey-patch for Python 3.13 compatibility with PySpark <= 3.4
+import types
+if 'typing.io' not in sys.modules:
+    fake_module = types.ModuleType('typing.io')
+    fake_module.BinaryIO = typing.BinaryIO
+    sys.modules['typing.io'] = fake_module
+    typing.io = fake_module
+
+# Fix for Java 17+ (DirectByteBuffer memory issues)
+# We use PYSPARK_SUBMIT_ARGS to pass these exclusively to the driver,
+# preventing them from being sent to Java 8 executors.
+java_options = (
+    "--add-opens=java.base/java.lang=ALL-UNNAMED "
+    "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+    "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+    "--add-opens=java.base/java.io=ALL-UNNAMED "
+    "--add-opens=java.base/java.net=ALL-UNNAMED "
+    "--add-opens=java.base/java.nio=ALL-UNNAMED "
+    "--add-opens=java.base/java.util=ALL-UNNAMED "
+    "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+    "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+    "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+    "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+    "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+    "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+    "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED "
+    "-Djava.security.manager=allow"
+)
+os.environ["PYSPARK_SUBMIT_ARGS"] = f"--driver-java-options '{java_options}' pyspark-shell"
 
 # ============================================================
 # Logging
@@ -128,6 +158,25 @@ def create_spark_session(config: dict = None, app_name: str = None):
     spark_config = config.get("spark", {})
     name = app_name or spark_config.get("app_name", "Olist-Pipeline")
     master = spark_config.get("master", "local[*]")
+
+    # Fix for Java 17+ (DirectByteBuffer memory issues)
+    java_options = (
+        "-Djava.security.manager=allow "
+        "--add-opens=java.base/java.lang=ALL-UNNAMED "
+        "--add-opens=java.base/java.lang.invoke=ALL-UNNAMED "
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED "
+        "--add-opens=java.base/java.io=ALL-UNNAMED "
+        "--add-opens=java.base/java.net=ALL-UNNAMED "
+        "--add-opens=java.base/java.nio=ALL-UNNAMED "
+        "--add-opens=java.base/java.util=ALL-UNNAMED "
+        "--add-opens=java.base/java.util.concurrent=ALL-UNNAMED "
+        "--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED "
+        "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED "
+        "--add-opens=java.base/sun.nio.cs=ALL-UNNAMED "
+        "--add-opens=java.base/sun.security.action=ALL-UNNAMED "
+        "--add-opens=java.base/sun.util.calendar=ALL-UNNAMED "
+        "--add-opens=java.security.jgss/sun.security.krb5=ALL-UNNAMED"
+    )
 
     builder = SparkSession.builder \
         .appName(name) \

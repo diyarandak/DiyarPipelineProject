@@ -11,12 +11,12 @@ from processing.utils import setup_logger
 logger = setup_logger("SupersetRegistration")
 
 # Superset Connection Details (from docker-compose)
-SUPERSET_URL = "http://localhost:8088"
+SUPERSET_URL = "http://superset:8088"
 USERNAME = "admin"
 PASSWORD = "admin"
 
 # Spark Thrift Server / Iceberg Connection
-SPARK_URI = "hive://spark-iceberg:10000/iceberg_catalog"
+SPARK_URI = "hive://spark-thriftserver:10000/iceberg_catalog"
 DB_NAME = "Olist_Iceberg"
 
 # The Gold tables we want to visualize
@@ -30,40 +30,39 @@ TABLES = [
     "fact_order_sales"
 ]
 
-def get_auth_token():
-    """Logs into Superset API and returns JWT token."""
+def get_auth_session():
+    """Logs into Superset API and returns a configured requests Session."""
     logger.info("Logging into Superset API...")
+    session = requests.Session()
     try:
-        response = requests.post(f"{SUPERSET_URL}/api/v1/security/login", json={
+        response = session.post(f"{SUPERSET_URL}/api/v1/security/login", json={
             "username": USERNAME,
             "password": PASSWORD,
             "provider": "db"
         })
         response.raise_for_status()
-        return response.json().get("access_token")
+        token = response.json().get("access_token")
+        session.headers.update({"Authorization": f"Bearer {token}"})
+        return session
     except Exception as e:
         logger.error(f"Failed to login: {e}. Is Superset running? (Check Docker)")
         return None
 
-def get_csrf_token(token):
+def get_csrf_token(session):
     """Fetches CSRF token required for POST requests."""
-    headers = {"Authorization": f"Bearer {token}"}
-    response = requests.get(f"{SUPERSET_URL}/api/v1/security/csrf_token/", headers=headers)
+    response = session.get(f"{SUPERSET_URL}/api/v1/security/csrf_token/")
     if response.ok:
-        return response.json().get("result")
-    return None
+        csrf = response.json().get("result")
+        session.headers.update({"X-CSRFToken": csrf})
+        return True
+    return False
 
-def register_database(token, csrf):
+def register_database(session):
     """Creates the Spark-Iceberg database connection in Superset."""
     logger.info(f"Checking/Registering Database Connection: {DB_NAME}")
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "X-CSRFToken": csrf,
-        "Content-Type": "application/json"
-    }
     
     # Check if DB already exists
-    resp = requests.get(f"{SUPERSET_URL}/api/v1/database/?q=(filters:!((col:database_name,opr:eq,value:{DB_NAME})))", headers=headers)
+    resp = session.get(f"{SUPERSET_URL}/api/v1/database/?q=(filters:!((col:database_name,opr:eq,value:{DB_NAME})))")
     if resp.ok and resp.json().get("count", 0) > 0:
         db_id = resp.json()["result"][0]["id"]
         logger.info(f"  -> Database '{DB_NAME}' already exists (ID: {db_id}).")
@@ -76,7 +75,7 @@ def register_database(token, csrf):
         "expose_in_sqllab": True,
         "allow_run_async": False
     }
-    resp = requests.post(f"{SUPERSET_URL}/api/v1/database/", json=payload, headers=headers)
+    resp = session.post(f"{SUPERSET_URL}/api/v1/database/", json=payload)
     if resp.ok:
         db_id = resp.json().get("id")
         logger.info(f"  -> Database created successfully! (ID: {db_id})")
@@ -85,14 +84,8 @@ def register_database(token, csrf):
         logger.error(f"  -> Failed to create DB: {resp.text}")
         return None
 
-def register_datasets(token, csrf, db_id):
+def register_datasets(session, db_id):
     """Registers the Gold tables as Datasets for visualization."""
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "X-CSRFToken": csrf,
-        "Content-Type": "application/json"
-    }
-    
     logger.info("Registering Gold Layer Tables as Datasets...")
     for table in TABLES:
         payload = {
@@ -101,7 +94,7 @@ def register_datasets(token, csrf, db_id):
             "table_name": table
         }
         
-        resp = requests.post(f"{SUPERSET_URL}/api/v1/dataset/", json=payload, headers=headers)
+        resp = session.post(f"{SUPERSET_URL}/api/v1/dataset/", json=payload)
         if resp.status_code == 201:
             logger.info(f"  [+] Successfully registered: {table}")
         elif resp.status_code == 422:
@@ -112,18 +105,17 @@ def register_datasets(token, csrf, db_id):
 def main():
     logger.info("Starting Superset Automatic Registration Script...")
     
-    token = get_auth_token()
-    if not token:
+    session = get_auth_session()
+    if not session:
         sys.exit(1)
         
-    csrf = get_csrf_token(token)
-    if not csrf:
+    if not get_csrf_token(session):
         logger.error("Could not get CSRF token.")
         sys.exit(1)
         
-    db_id = register_database(token, csrf)
+    db_id = register_database(session)
     if db_id:
-        register_datasets(token, csrf, db_id)
+        register_datasets(session, db_id)
         logger.info("🎉 All tables registered! You can now build dashboards in Superset (http://localhost:8088)")
     else:
         logger.error("Aborting dataset registration due to DB error.")

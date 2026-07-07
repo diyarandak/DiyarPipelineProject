@@ -1,25 +1,42 @@
-# Olist Big Data Pipeline - Proje Mimari ve Sonuç Raporu
+# 📊 Olist Veri Boru Hattı - Detaylı Analiz ve Proje Raporu
 
-## 1. Proje Özeti
-Bu proje, Brezilya merkezli Olist e-ticaret platformunun ~100.000 gerçek sipariş verisini modern veri mühendisliği teknikleriyle işleyen uçtan uca bir Büyük Veri (Big Data) hattı projesidir. Veriler "Medallion Mimarisi" (Bronze -> Silver -> Gold) prensiplerine sadık kalınarak işlenmiş, temizlenmiş ve İş Zekası (BI) raporlamalarına hazır hale getirilmiştir.
+## 1. Proje Amacı ve Kapsamı
+Bu projenin temel amacı, karmaşık, dağınık ve kirli olabilen gerçek dünya verilerini (Olist E-Ticaret Veriseti) alıp, büyük veri teknolojileri (Big Data Technologies) kullanarak ölçeklenebilir, güvenilir ve raporlanabilir bir yapıya kavuşturmaktır. 
+Geleneksel veritabanları yerine **Apache Iceberg** kullanılarak modern Data Lakehouse mimarisi benimsenmiştir.
 
-## 2. Kullanılan Teknolojiler ve Mimari
-- **Veri Kaynağı:** Kaggle API (Olist Dataset - 9 Adet CSV)
-- **Veri İşleme Motoru:** Apache Spark (PySpark)
-- **Tablo Formatı ve Depolama:** Apache Iceberg (HDFS/Docker üzerinde)
-- **Veri Kalitesi (Data Quality):** PySpark (Tekrar eden veri ve Null kontrolü) ve Pytest
-- **Orkestrasyon:** Apache Airflow
-- **İş Zekası (BI) ve Görselleştirme:** Apache Superset
+## 2. Mimari Kararlar ve Kullanılan Teknolojiler
 
-## 3. Veri Katmanları (Medallion Mimarisi)
-- **Bronze Katman (Ham Veri):** Kaggle üzerinden indirilen CSV dosyaları, hiçbir manipülasyona veya veri kaybına uğramadan orijinal formatında (raw) Iceberg tabloları olarak depolanmıştır.
-- **Silver Katman (Temizlenmiş Veri):** Bronze katmandan alınan veriler üzerinde deduplication (tekrar eden verilerin silinmesi), veri tipi dönüşümleri (örneğin string tarihlerin timestamp'e çevrilmesi) ve null değer temizliği yapılmıştır. İhtiyaç duyulmayan sütunlar bu aşamada elenmiştir.
-- **Gold Katman (İş Modeli - Star Schema):** Temizlenmiş Silver veriler, analitik sorgular için en verimli yapı olan Kimball Star Schema modeline dönüştürülmüştür. 
-  - **Fact Tabloları:** `fact_order_sales` ve `fact_order_payments` adında 2 ana süreç tablosu oluşturulmuştur.
-  - **Dimension Tabloları:** `dim_customers`, `dim_sellers`, `dim_products`, `dim_geolocation`, `dim_dates` boyut tabloları ile model desteklenmiştir.
+- **Apache Spark (PySpark):** Verinin boyutu büyüdükçe Pandas gibi kütüphanelerin yetersiz kalacağı öngörülerek, dağıtık veri işleme motoru olarak PySpark tercih edilmiştir.
+- **Apache Iceberg:** Veri gölünde ACID transaction (güvenli okuma/yazma) desteği sağlamak, zamanda yolculuk (time-travel) özelliklerinden faydalanmak ve şema evrimini (schema evolution) kolay yönetmek için kullanılmıştır.
+- **Apache Airflow:** Görevleri otomatize etmek ve bağımlılıkları yönetmek (önce Bronze, sonra Silver, en son Gold katmanın sırasıyla çalışması) amacıyla güçlü bir orkestrasyon aracı olarak sürece dahil edilmiştir.
+- **Docker Compose:** Ortam bağımsızlığı sağlamak ve tüm altyapının (HDFS, Spark, Superset, Airflow) tek bir `make setup` komutuyla her bilgisayarda aynı şekilde çalışmasını garantilemek için izole konteyner mimarisi kullanılmıştır.
 
-## 4. Pipeline Orkestrasyonu (Airflow)
-Tüm süreç Apache Airflow kullanılarak otomatikleştirilmiştir. Yazılan Airflow DAG (Yönlü Döngüsüz Grafik) sayesinde Bronze, Silver ve Gold süreçleri sırasıyla ve birbirine bağımlı olarak çalıştırılmış, oluşabilecek hatalara karşı retry (yeniden deneme) mekanizmaları kurgulanmıştır.
+## 3. Medallion Mimarisi ile Veri İşleme Aşamaları
 
-## 5. Veri Kalitesi ve Standartlar
-Kod tabanında tutarlılığı sağlamak amacıyla **Pre-commit hook** (Black, Flake8) yapıları kurulmuştur. Veri hatlarındaki (pipeline) hatalı, eksik (Null) veya tekrar eden kayıtları saptayıp DLQ (Dead Letter Queue) tablolarına yönlendiren PySpark fonksiyonları yazılmış, bunların doğruluğu **Pytest** üzerinden otomatize test edilmiştir. Ayrıca, projenin lokal ortamda baştan uca tek tuşla test edilebilmesi için `main.py` (Master Controller) mekanizması eklenmiştir.
+### 🥉 Bronze Katmanı (Ingestion - Veri Alma)
+- Tüm ham CSV dosyaları Kaggle üzerinden okunur.
+- Hiçbir filtreleme veya tip dönüşümü yapılmadan `.writeTo("iceberg_catalog.bronze.table_name")` komutuyla doğrudan Data Lake'e (Veri Gölüne) yazılır.
+- **Amaç:** Verinin orijinal halini kaybetmeden güvenli ve ucuz bir depolama alanına yedeklemek.
+
+### 🥈 Silver Katmanı (Transformation & Data Quality - Temizleme)
+- Ham veriler Bronze katmanından okunur. Sipariş tarihleri (timestamp) doğru standart formata çevrilir.
+- Null (boş) veya eksik olan ürün boyutları, ağırlıkları ve analizde anlamsız sonuçlar doğuracak satırlar (data quality checks) temizlenir.
+- Özellikle `product_category_name_translation` tablosu kullanılarak, Portekizce olan kategori isimleri (örneğin *beleza_saude*) İngilizce karşılıklarına (*health_beauty*) çevrilir. Böylece küresel bir analistin veriyi okuması ve anlaması sağlanır.
+
+### 🥇 Gold Katmanı (Dimensional Modeling - Modelleme)
+- Temizlenmiş (Silver) veriler, iş zekası (BI) araçlarının ve yöneticilerin en kolay anlayacağı **Yıldız Şema (Star Schema)** yapısına getirilir.
+- **Fact Tabloları:** `Master_Sales_Auto` ve `Master_Payments_Auto` tabloları oluşturulur. Siparişler, sipariş edilen ürünler, fiyatlar, kargo ücretleri ve teslimat süreleri bu tablolar içinde iş zekasına hazır halde harmanlanır.
+- **Dimension (Boyut) Tabloları:** Müşteri boyutları (Customer Dim) ve Ürün boyutları (Product Dim) ayrı ayrı normalize edilir.
+- Bu katman sayesinde Superset gibi BI araçları, arka planda tablolar arası karmaşık JOIN işlemleri yapmak zorunda kalmaz ve devasa grafikler saniyeler içinde yüklenir.
+
+## 4. İş Zekası (BI) Çıktıları ve Şirket İçin Karar Alma (Decision Making)
+
+Superset üzerinde oluşturulan "Olist E-Ticaret Analitik Portfolyosu", şirket yöneticilerine şu kararları veri odaklı (data-driven) alma yeteneği sunar:
+
+1. **Bölgesel Lojistik Optimizasyonu:** "Şehirlere Göre Kargo Maliyeti" haritası sayesinde kargo masraflarının en yüksek olduğu eyaletler (örneğin Kuzey Brezilya) tespit edilebilir. Bu eyaletlere yeni depolar (hub) kurularak teslimat süreleri ve kargo maliyetleri düşürülebilir.
+2. **Pazarlama ve Kampanya Stratejileri:** "Kategori Kralları" (Health_Beauty, Watches vs.) çubuk grafiği üzerinden, şirketin cirosunu sırtlayan ana kategoriler net bir şekilde görülür. Buna özel indirim kampanyaları ve dijital reklam bütçeleri ayrılabilir.
+3. **Taksit ve Finansal Yönetim:** Müşterilerin yoğunlukla kaç taksit tercih ettiği pasta grafiği ile analiz edilerek, kredi kartı bankalarıyla yapılacak komisyon ve taksit anlaşmaları şirket lehine optimize edilebilir.
+4. **Operasyonel Başarı Oranları:** Teslimat başarı grafiği incelenerek, yolda iptal olan veya geciken siparişlerin yüzdesi görülür; buna göre kargo şirketleriyle olan sözleşmeler gözden geçirilebilir.
+
+## 5. Sonuç
+Bu proje; modern bir Veri Mühendisinin baştan sona veri çıkarma (Extract), dönüştürme (Transform), yükleme (Load) ve görselleştirme (Visualize) adımlarına tamamen hakim olduğunu kanıtlayan, üretime hazır (production-ready) güçlü bir analitik platformdur.

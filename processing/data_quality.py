@@ -6,6 +6,10 @@ Checks for nulls in critical columns, identifies duplicates,
 and routes rejected records to a Dead Letter Queue (DLQ) Iceberg table.
 """
 
+import sys
+from pathlib import Path
+from processing.utils import setup_logger
+
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 from typing import List, Tuple

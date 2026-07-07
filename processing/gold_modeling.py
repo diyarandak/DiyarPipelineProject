@@ -8,7 +8,6 @@ Writes the final tables to Gold Iceberg tables.
 
 import sys
 from pathlib import Path
-import pyspark.sql.functions as F
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -19,6 +18,8 @@ from processing.utils import (
     create_spark_session,
     save_watermark
 )
+
+import pyspark.sql.functions as F
 
 logger = setup_logger("GoldModeling")
 
@@ -154,9 +155,11 @@ def process_gold_layer():
             row_count = df.count()
             logger.info(f"  Writing {row_count} rows to {target}...")
             
-            writer = df.write.format("iceberg").mode("overwrite")
             if partition_cols:
-                writer = writer.partitionBy(*partition_cols)
+                df = df.sortWithinPartitions(*partition_cols)
+                writer = df.write.format("iceberg").mode("overwrite").partitionBy(*partition_cols)
+            else:
+                writer = df.write.format("iceberg").mode("overwrite")
             writer.saveAsTable(target)
             
             save_watermark(table_name=table_name, rows_processed=row_count, layer="gold", status="SUCCESS")

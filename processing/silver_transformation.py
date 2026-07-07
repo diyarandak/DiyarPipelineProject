@@ -8,9 +8,6 @@ Supports dynamic partitioning based on YAML config.
 
 import sys
 from pathlib import Path
-import pyspark.sql.functions as F
-from pyspark.sql.types import TimestampType
-
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -21,6 +18,9 @@ from processing.utils import (
     create_spark_session,
     save_watermark
 )
+
+import pyspark.sql.functions as F
+from pyspark.sql.types import TimestampType
 
 logger = setup_logger("SilverCleansing")
 
@@ -84,10 +84,11 @@ def process_silver_layer():
             row_count = df.count()
             logger.info(f"  Writing {row_count} cleansed rows to {target_table}...")
             
-            writer = df.write.format("iceberg").mode("overwrite")
-            
             if partition_cols:
-                writer = writer.partitionBy(*partition_cols)
+                df = df.sortWithinPartitions(*partition_cols)
+                writer = df.write.format("iceberg").mode("overwrite").partitionBy(*partition_cols)
+            else:
+                writer = df.write.format("iceberg").mode("overwrite")
                 
             writer.saveAsTable(target_table)
             
