@@ -47,13 +47,17 @@ def process_silver_layer():
                 logger.warning(f"Bronze table {bronze_table} not found. Skipping. {e}")
                 continue
             
-            # 2. Data Quality: Deduplication
+            # 2. Data Quality: Deduplication & Null Checks
             if "key_columns" in table_conf:
                 key_cols = table_conf["key_columns"]
-                df, duplicate_df = check_duplicates(df, key_cols)
                 
-                # Write duplicates to DLQ
+                # Check for duplicates
+                df, duplicate_df = check_duplicates(df, key_cols)
                 write_to_dlq(duplicate_df, table_name, "Duplicate Primary Key", catalog_name)
+                
+                # Check for nulls in primary keys
+                df, null_df = check_nulls(df, key_cols)
+                write_to_dlq(null_df, table_name, "Null Primary Key", catalog_name)
                     
             # 3. Data Quality: Type Casting (Timestamps)
             ts_col = table_conf.get("timestamp_column")
