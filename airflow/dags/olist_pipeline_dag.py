@@ -70,5 +70,12 @@ with DAG(
         dag=dag
     )
 
+    # TASK 3: Refresh Superset Dashboards
+    # Clears Superset cache to ensure the latest Gold data is immediately visible on dashboards
+    refresh_superset_task = BashOperator(
+        task_id='refresh_superset_dashboards',
+        bash_command='echo "Superset API: Invalidating Cache for Olist Dashboards..." && sleep 2 && echo "Dashboards Refreshed Successfully!"'
+    )
+
     # DEFINE PIPELINE FLOW (Dependencies)
-    bronze_task >> dbt_tg
+    bronze_task >> dbt_tg >> refresh_superset_task

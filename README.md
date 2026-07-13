@@ -1,20 +1,11 @@
 # 🚀 Olist Gelişmiş Büyük Veri Boru Hattı (Modern Data Stack)
 
-Bu proje, Brezilya E-Ticaret Platformu Olist'e ait gerçek veri seti kullanılarak geliştirilmiş, uçtan uca, kurumsal seviyede bir **Büyük Veri (Big Data) ve Veri Mühendisliği** projesidir.
-
-Modern Data Stack (Modern Veri Yığını) prensipleri benimsenerek; veriler Data Lake (Veri Gölü) ortamından alınmış, **Medallion Mimarisi** (Bronze, Silver, Gold) kullanılarak işlenmiş ve son kullanıcılar için Apache Superset üzerinde analiz edilebilir **Yıldız Şema (Star Schema)** modeline dönüştürülmüştür. Bütün bu akış Apache Airflow tarafından orkestre edilmektedir.
+Bu proje, Brezilya E-Ticaret Platformu Olist'e ait gerçek veri seti kullanılarak geliştirilmiş, uçtan uca, kurumsal seviyede bir **Büyük Veri (Big Data) ve Veri Mühendisliği** projesidir. Projenin amacı; ham ve dağınık haldeki bir e-ticaret verisinin, en modern veri mühendisliği standartlarında (Modern Data Stack) işlenerek şirket için değerli bir "iş zekası" kararına dönüşme serüvenini sıfırdan inşa etmektir.
 
 ---
 
-## 📸 Superset Analitik Dashboard
-
-Projemizin çıktısı olan ve otomatik Python API scriptleri ile saniyeler içinde Superset üzerinde ayağa kalkan interaktif Olist Dashboard'undan görüntüler:
-
-![Dashboard 1](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.30.png)
-![Dashboard 2](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.53.png)
-![Dashboard 3](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.12.png)
-![Dashboard 4](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.26.png)
-![Dashboard 5](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.39.png)
+## 🧠 AI Sunum Üreticisi İçin Kılavuz (Prompt Context)
+Bu döküman, yapay zeka araçlarının (ChatGPT, Claude vb.) bu projeden profesyonel bir PowerPoint (.pptx) sunumu hazırlayabilmesi için özel olarak son derece detaylı yazılmıştır. Sunum hazırlarken lütfen aşağıdaki 9 adımı slaytlara bölerek, mimari karşılaştırmaları (Avantaj/Dezavantaj) vurgulayarak ve mühendislik terimlerini (ELT, OLAP, SCD Type 2, DAG) ön plana çıkararak tasarlayın.
 
 ---
 
@@ -25,33 +16,71 @@ Proje, veriyi ham halinden en değerli analitik haline kadar katman katman işle
 ```mermaid
 graph LR
     subgraph EL ["Extract & Load (EL)"]
-        CSV[("Kaggle Ham CSV")] -->|PySpark Ingestion| Bronze[("Bronze Katman\nIceberg / Parquet")]
+        CSV[("Kaggle Ham CSV\n(OLTP)")] -->|PySpark Ingestion\nWatermark| Bronze[("Bronze Katman\nIceberg / Parquet")]
     end
     
     subgraph T ["Transform (T) - dbt"]
-        Bronze -->|dbt Staging Deduplication| Silver[("Silver Katman\nTemizlenmiş Veri")]
-        Silver -->|dbt Models| Gold[("Gold Katman\nYıldız Şema")]
+        Bronze -->|dbt Staging\nSanal Temizlik| Silver[("Silver Katman\n(View)")]
+        Silver -->|dbt Models\nStar Schema| Gold[("Gold Katman\n(Table)")]
     end
     
     subgraph Serve ["Serve & Analyze"]
-        Gold -->|Apache Doris| BI["Apache Superset\nDashboard API"]
+        Gold -->|Apache Doris\nMPP Motoru| BI["Apache Superset\n(OLAP Dashboards)"]
     end
     
-    Airflow(("Apache Airflow")) -.->|PySpark Tetikler| Bronze
+    Airflow(("Apache Airflow\n(Cosmos ile Paralel)")) -.->|PySpark Tetikler| Bronze
     Airflow -.->|dbt Orkestre Eder| Silver
 ```
 
-| Katman | Araç | Görev |
-| :--- | :--- | :--- |
-| 🥉 **Bronze (Ham)** | PySpark | Dış kaynaktaki veriyi hiçbir değişikliğe uğratmadan veri gölüne (Apache Iceberg) yazar. |
-| 🥈 **Silver (Staging)** | dbt | Veri tiplerini düzeltir, **SELECT DISTINCT** mantığıyla mükerrer kayıtları temizler, NULL kayıtları süzer ve standartlaştırır. |
-| 🥇 **Gold (Marts)** | dbt | Temizlenmiş verileri Star Schema yapısında birleştirerek iş birimine hazır Fact ve Dimension tabloları oluşturur. |
+---
+
+## 🚀 Projenin Teknik Adımları ve Mühendislik Kararları
+
+### 1. Verinin Çıkarılması (Bronze Katmanı ve Iceberg)
+Projeye başlarken ham CSV dosyalarını klasik HDFS üzerinde tutmak yerine, üzerine **Apache Iceberg** formatını giydirerek sistemi ACID yetenekleri olan bir **Veri Gölevi (Data Lakehouse)** yapısına çevirdik.
+*   **Incremental Loading (Yığın Su İşareti - Watermark):** Sistem gece 03:00'te çalıştığında tüm veriyi baştan okumaz. `watermark.json` dosyasını kontrol eder; sadece yeni gelen veya önceki gün hata almış (FAILED) dosyaları bularak göle **Append (Ekleme)** mantığıyla yazar. Bu sayede veri çiftlenmesi (duplication) önlenir.
+
+### 2. ETL'den ELT'ye Geçiş ve Apache Doris
+Faz 1 projelerinde dönüşüm işlemleri Spark üzerinde (ETL) yapılıyordu. Bu projede **ELT (Extract, Load, Transform)** yaklaşımına geçtik.
+*   **Neden ELT?** ETL'de veri ağ üzerinden RAM'e çekilir (darboğaz yaratır). ELT'de ise hesaplama veritabanına itilir (Pushdown), ağ maliyeti sıfırlanır.
+*   **HDFS vs Doris:** HDFS ucuz disklerde devasa ham verileri saklamak için mükemmeldir. Apache Doris ise inanılmaz hızlı, sütun bazlı ve MPP (Devasa Paralel İşleme) yeteneklerine sahip gerçek zamanlı bir analitik veritabanıdır. dbt, Doris'in "External Catalog" yeteneğini kullanarak HDFS'i okur; yani dbt sadece SQL ile Doris'e emir verir, asıl ağır yükü Doris kaldırır.
+
+### 3. SQL vs Spark ve dbt'nin Gücü
+Sadece SQL kullanmak statiktir, test edilemez. Sadece Spark kullanmak donanım canavarıdır. **dbt (Data Build Tool)** bu iki dünyayı birleştirir.
+*   İçine gömülü Jinja (Python) şablonları ile saf SQL'e programlanabilir bir beyin ekler. Yazılan modelleri derleyerek (compile) Doris'in anlayacağı saf SQL'e dönüştürür.
+
+### 4. Temizlik ve Standartlaştırma (Silver / Staging Katmanı)
+Silver katmanında fiziki veri kopyalaması yapılmaz; veriler disk israfını önlemek için **Sanal Tablo (View)** olarak oluşturulur.
+*   Boş verilerin silinmesi veya mükerrer (`DISTINCT`) kayıtların ayıklanması doğrudan `.sql` modellerinin içinde çözülür (DLQ yerine doğrudan kod içi filtre).
+*   **Çift Dikiş (Defense in Depth):** SQL içindeki filtrelemeye ek olarak `schema.yml` dosyasına `not_null` ve `unique` testleri yazılarak bozuk verinin Gold katmana sızması kesin olarak engellenir.
+
+### 5. İş Modelleri (Gold Katmanı) ve OLTP'den OLAP'a Geçiş
+Kaynak veritabanı (Olist) siparişleri hızlı kaydetmek için tasarlanmış dağınık bir **OLTP (Online Transaction Processing)** sistemidir. İş zekası analistleri ise milyonlarca satırı saniyeler içinde okumak (**OLAP**) isterler.
+*   **Star Schema (Yıldız Şema):** Karmaşık OLTP verisini alıp merkezde `fact_orders` (ciro vb.) ve etrafında onu açıklayan `dim_customers`, `dim_products` gibi tabloların olduğu denormalize bir yapıya çevirdik. 
+*   **Overwrite Stratejisi:** Gold katmanında 100 bin satırlık veriyi incremental işlemek yerine kodu basit tutmak adına (Keep it simple) her gün baştan silip yaratan (Overwrite - Table) stratejisini seçtik. Çünkü Doris bu kadar küçük bir veriyi saniyeler içinde baştan yaratabilir.
+
+### 6. dbt'nin Gelişmiş Kurumsal Özellikleri
+*   **Seeds:** Eyalet kodları gibi değişmeyen statik referans verileri CSV olarak yüklenir ve otomatik tablo yapılır.
+*   **Macros:** DRY (Don't Repeat Yourself) prensibiyle, uzun `CASE WHEN` blokları fonksiyonlaştırılarak tekrar tekrar kullanılır.
+*   **Analyses:** Kalıcı tablo gerektirmeyen tek seferlik ad-hoc analizler için kullanılır.
+*   **state:modified Komutu:** CI/CD süreçlerinde devrim yaratır. Kod güncellendiğinde 100 tablonun tamamını değil, sadece kodu değişen tabloları (ve bağımlılarını) `dbt build -s state:modified+` ile tetikleyerek devasa compute tasarrufu sağlar.
+
+### 7. Zaman Makinesi: Müşteri Tarihçesi Takibi (SCD Type 2)
+Bir müşterinin ili değiştiğinde geçmişi silip üstüne yazmak (SCD 1 / Incremental) geçmiş analizlerini bozar. Biz dbt **Snapshots** özelliğini kullanarak **SCD Type 2** metodolojisini kurduk.
+*   `strategy='check'` özelliği sayesinde adres kolonu değiştiği an eski kaydın `valid_to` tarihini kapatır, altına güncel tarihi `valid_from` olarak basıp yeni satır açar. Sistem zaman makinesine dönüşür.
+
+### 8. Orkestrasyon ve Paralel Çalışma (Airflow ve Cosmos)
+Projenin kalbi Apache Airflow'dur. Her gece 03:00'da çalışır, hataları 3 kez dener, zaman aşımında (SLA) uyarı atar.
+*   **Astronomer Cosmos:** Normalde dbt'yi Airflow'da çalıştırırsanız tek bir dev kara kutu görünür. Cosmos ise dbt klasörünü okur ve içindeki SQL modellerini otomatik olarak Airflow görevlerine (tasks) dönüştürür.
+*   **Paralel Çalışma:** Airflow zaten doğası gereği bağımsız görevleri paralel çalıştırır. Cosmos'un bu dönüşümü yapması sayesinde Airflow, dbt'nin bağımlılık haritasına (DAG) bakar ve alakasız tabloları aynı anda (paralel) çalıştırarak sistemi muazzam hızlandırır.
+
+### 9. Dashboard Devrimi (Spark Thrift vs Apache Doris)
+Eski yapılarda BI araçları SQL konuştuğu için araya Spark Thrift Server konulurdu. Bu da SQL'i Spark işlerine çevirirken devasa JVM başlatma sürelerine (Latency) ve eşzamanlı analist girdiğinde bellek hatalarına (Concurrency çöküşü) neden olurdu.
+*   **Neden Doris?** Biz Apache Superset'i doğrudan Doris'e bağladık. Doris zaten sıfırdan C++ ile SQL konuşmak için yazılmıştır. **Zone Map** (Blok Haritası) indeksleri sayesinde tüm veriyi taramaz, grafiğin noktasını saniyeden kısa sürede getirir. Çevirici köprü (Thrift) ortadan kalktığı için milisaniye hızında Dashboard'lar elde edildi.
 
 ---
 
-## 🌟 Veri Modelleme (Star Schema)
-
-Analitik sorguların inanılmaz hızlı çalışması ve raporlama araçlarının (Superset vb.) rahat okuyabilmesi için **Gold** katmanımız Yıldız Şema yapısında tasarlanmıştır. Ciro hesaplamalarında **Ürün Fiyatı + Kargo (Freight)** hesaba katılarak tam kapsamlı Gross Merchandise Value (GMV) elde edilmiştir.
+## 🌟 Veri Modelleme ER Diyagramı (Star Schema)
 
 ```mermaid
 erDiagram
@@ -131,23 +160,15 @@ erDiagram
 
 ---
 
-## 🛠️ Kullanılan Teknolojiler
+## 📸 Superset Analitik Dashboard
 
-*   **Veri Çıkarma (Ingestion):** PySpark (Büyük boyutlu verileri hızlıca Iceberg tablosu yapar)
-*   **Veritabanı / Veri Ambarı:** Apache Doris (Aşırı hızlı, modern OLAP motoru)
-*   **Veri Dönüştürme:** dbt (Data Build Tool - SQL ile test, dönüşüm, mükerrer veri engelleme)
-*   **Orkestrasyon:** Apache Airflow & Astronomer Cosmos (Hata bildirimli gelişmiş DAG zincirleri)
-*   **Veri Görselleştirme:** Apache Superset (Python API ile tam otomatik Dashboard Kurulumu)
+Projemizin çıktısı olan ve otomatik Python API scriptleri ile saniyeler içinde Superset üzerinde ayağa kalkan interaktif Olist Dashboard'undan görüntüler:
 
----
-
-## ✨ Projenin Kurumsal (Enterprise) Özellikleri
-
-*   **Otomatik Dashboard Üretimi:** `visualization/create_dashboard.py` üzerinden Superset REST API kullanılarak tüm tablo kayıtları, veri setleri ve 10 farklı grafik otomatik oluşturulur.
-*   **Deduplication (Veri Tekilleştirme):** Ingestion süreçlerinde yaşanabilecek tekrar yüklemeler (Data Duplication) dbt katmanında `DISTINCT` mekanizması ve `_ingested_at` kolon filtresiyle önlenir.
-*   **Gelişmiş Metric'ler:** Treemap, Sunburst ve Coğrafi dağılım grafiklerinde Superset'in en modern ECharts bileşenleri (`treemap_v2`, `sunburst_v2` vb.) kullanıldı.
-*   **dbt Macros & Seeds:** Tekrar eden SQL kodlarının modüler (DRY) yapılması ve Brezilya eyalet gibi referans verilerin statik CSV olarak sisteme alınması.
-*   **SQL Linter:** Kod bütünlüğünü sağlamak için `SQLFluff` konfigürasyonu.
+![Dashboard 1](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.30.png)
+![Dashboard 2](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.53.png)
+![Dashboard 3](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.12.png)
+![Dashboard 4](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.26.png)
+![Dashboard 5](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.39.png)
 
 ---
 
@@ -183,7 +204,16 @@ AdvancedBigDataPipeline/
 
 ---
 
-## 🚀 Projeyi Çalıştırma (Kurulum)
+## 🛠️ Kullanılan Teknolojiler
+*   **Veri Çıkarma (Ingestion):** PySpark
+*   **Veritabanı / Veri Ambarı:** Apache Doris
+*   **Veri Dönüştürme:** dbt (Data Build Tool)
+*   **Orkestrasyon:** Apache Airflow & Astronomer Cosmos
+*   **Veri Görselleştirme:** Apache Superset
+
+---
+
+## 🚀 Projeyi Çalıştırma (Kurulum Kılavuzu)
 
 ### 1. Servisleri Başlatma
 Tüm altyapı (Hadoop, Doris, Airflow, Superset) Docker üzerinde çalışır:
