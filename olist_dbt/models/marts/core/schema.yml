@@ -1,0 +1,150 @@
+version: 2
+
+models:
+  # ============================
+  # DIMENSION TABLES
+  # ============================
+  - name: dim_customers
+    description: "Customer dimension — one row per unique real customer (deduplicated by customer_unique_id)."
+    columns:
+      - name: customer_key
+        description: "Primary key (customer_unique_id)"
+        tests:
+          - unique
+          - not_null
+      - name: customer_region
+        description: "Geographic macro-region of Brazil"
+        tests:
+          - accepted_values:
+              values: ['Sudeste', 'Sul', 'Nordeste', 'Centro-Oeste', 'Norte', 'Desconhecido']
+      - name: customer_state
+        description: "Customer state code"
+      - name: customer_city
+        description: "Customer city"
+
+  - name: dim_products
+    description: "Product dimension — enriched with English categories and size/weight classifications."
+    columns:
+      - name: product_key
+        description: "Primary key (product_id)"
+        tests:
+          - unique
+          - not_null
+      - name: product_size_category
+        description: "Derived size class based on volume"
+        tests:
+          - accepted_values:
+              values: ['small', 'medium', 'large', 'extra_large', 'unknown']
+      - name: product_category
+        description: "Product category"
+
+  - name: dim_sellers
+    description: "Seller dimension with regional grouping."
+    columns:
+      - name: seller_key
+        description: "Primary key (seller_id)"
+        tests:
+          - unique
+          - not_null
+      - name: seller_city
+        description: "Seller city"
+      - name: seller_state
+        description: "Seller state code"
+
+  - name: dim_payment_type
+    description: "Reference dimension for payment methods."
+    columns:
+      - name: payment_type_key
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_date
+    description: "Standard date dimension (2016–2019) with Portuguese month names."
+    columns:
+      - name: date_key
+        description: "Primary key (calendar date)"
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_geography
+    description: "Unified geography dimension combining customer and seller locations."
+    columns:
+      - name: geography_key
+        description: "Primary key (zip_state combo)"
+        tests:
+          - not_null
+
+  # ============================
+  # FACT TABLES
+  # ============================
+  - name: fact_orders
+    description: >
+      Order-level fact table. One row per order with pre-aggregated 
+      item, payment, review, and delivery performance metrics.
+    columns:
+      - name: order_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: customer_key
+        description: "FK to dim_customers"
+        tests:
+          - not_null
+      - name: order_date_key
+        description: "FK to dim_date"
+      - name: total_order_value
+        description: "Total order value (product + freight) in BRL"
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 500000
+      - name: delivery_status
+        description: "Whether the order was on_time, late, or pending"
+        tests:
+          - accepted_values:
+              values: ['on_time', 'late', 'pending']
+      - name: order_status
+        description: "Status of the order"
+      - name: avg_review_score
+        description: "Average review score"
+
+  - name: fact_order_items
+    description: >
+      Most granular fact — one row per line item.
+      Connects orders to products and sellers for detailed revenue analysis.
+    columns:
+      - name: order_item_surrogate_key
+        description: "Surrogate PK (order_id + item_id)"
+        tests:
+          - unique
+          - not_null
+      - name: product_key
+        description: "FK to dim_products"
+        tests:
+          - not_null
+      - name: seller_key
+        description: "FK to dim_sellers"
+        tests:
+          - not_null
+
+  - name: fact_seller_performance
+    description: >
+      Aggregated seller scorecard. One row per seller with KPIs:
+      revenue, delivery rate, cancellation rate, review scores.
+    columns:
+      - name: seller_key
+        description: "Primary key (seller_id)"
+        tests:
+          - unique
+          - not_null
+      - name: on_time_delivery_rate_pct
+        description: "Percentage of orders delivered on or before estimated date"
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100
+              row_condition: "on_time_delivery_rate_pct IS NOT NULL"

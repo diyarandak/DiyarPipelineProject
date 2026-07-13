@@ -1,0 +1,35 @@
+[sqlfluff]
+# SQLFluff Configuration for Olist dbt Project
+# Enforces consistent SQL style across all team members.
+dialect = mysql
+templater = dbt
+max_line_length = 120
+indent_unit = space
+
+[sqlfluff:indentation]
+tab_space_size = 4
+indent_unit = space
+
+[sqlfluff:rules:capitalisation.keywords]
+# Keywords should be UPPERCASE (SELECT, FROM, WHERE, etc.)
+capitalisation_policy = upper
+
+[sqlfluff:rules:capitalisation.identifiers]
+# Column/table names should be lowercase
+capitalisation_policy = lower
+
+[sqlfluff:rules:capitalisation.functions]
+# Functions should be UPPERCASE (COUNT, SUM, AVG, etc.)
+capitalisation_policy = upper
+
+[sqlfluff:rules:aliasing.table]
+# Require explicit AS keyword for table aliases
+aliasing = explicit
+
+[sqlfluff:rules:aliasing.column]
+# Require explicit AS keyword for column aliases
+aliasing = explicit
+
+[sqlfluff:rules:ambiguous.column_references]
+# Allow GROUP BY column number references (e.g., GROUP BY 1, 2)
+group_by_and_order_by_style = consistent

@@ -1,0 +1,10 @@
+olist_dbt:
+  outputs:
+    dev:
+      type: doris
+      host: doris-fe
+      port: 9030
+      schema: olist
+      user: root
+      password: ""
+  target: dev

@@ -1,0 +1,50 @@
+version: 2
+
+exposures:
+  - name: olist_executive_dashboard
+    type: dashboard
+    maturity: high
+    url: http://localhost:8088/superset/dashboard/olist-executive/
+    description: >
+      Executive-level Superset dashboard showing key business KPIs:
+      total revenue, order volume, delivery performance, and regional distribution.
+      This dashboard is consumed by business stakeholders and updated daily via Airflow.
+    depends_on:
+      - ref('fact_orders')
+      - ref('dim_customers')
+      - ref('dim_date')
+      - ref('dim_geography')
+    owner:
+      name: Diyar Andak
+      email: diyarandak@example.com
+
+  - name: seller_scorecard_dashboard
+    type: dashboard
+    maturity: medium
+    url: http://localhost:8088/superset/dashboard/seller-scorecard/
+    description: >
+      Seller performance scorecard showing on-time delivery rates,
+      average review scores, cancellation rates, and revenue per seller.
+      Used by operations team to monitor seller quality.
+    depends_on:
+      - ref('fact_seller_performance')
+      - ref('dim_sellers')
+      - ref('dim_geography')
+    owner:
+      name: Diyar Andak
+      email: diyarandak@example.com
+
+  - name: product_analytics_dashboard
+    type: dashboard
+    maturity: medium
+    url: http://localhost:8088/superset/dashboard/product-analytics/
+    description: >
+      Product category performance analysis — revenue by category,
+      average freight cost vs. product weight, and category trends over time.
+    depends_on:
+      - ref('fact_order_items')
+      - ref('dim_products')
+      - ref('dim_date')
+    owner:
+      name: Diyar Andak
+      email: diyarandak@example.com

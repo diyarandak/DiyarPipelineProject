@@ -1,0 +1,70 @@
+# ============================================================
+# Olist Big Data Pipeline — Table Configurations
+# ============================================================
+# Each table defines its source CSV, primary keys, and
+# optional partitioning strategy for the Silver/Gold layers.
+# ============================================================
+
+tables:
+  - name: olist_customers_dataset
+    source_file: olist_customers_dataset.csv
+    key_columns:
+      - customer_id
+    description: "Customer information and location data"
+
+  - name: olist_orders_dataset
+    source_file: olist_orders_dataset.csv
+    key_columns:
+      - order_id
+    timestamp_column: order_purchase_timestamp
+    partition_by:
+      - year
+      - month
+    description: "Order details including status and timestamps"
+
+  - name: olist_order_items_dataset
+    source_file: olist_order_items_dataset.csv
+    key_columns:
+      - order_id
+      - order_item_id
+    description: "Individual items within each order"
+
+  - name: olist_order_payments_dataset
+    source_file: olist_order_payments_dataset.csv
+    key_columns:
+      - order_id
+      - payment_sequential
+    description: "Payment information for each order"
+
+  - name: olist_order_reviews_dataset
+    source_file: olist_order_reviews_dataset.csv
+    key_columns:
+      - review_id
+    timestamp_column: review_creation_date
+    description: "Customer review scores and comments"
+
+  - name: olist_products_dataset
+    source_file: olist_products_dataset.csv
+    key_columns:
+      - product_id
+    description: "Product attributes — category, dimensions, weight"
+
+  - name: olist_sellers_dataset
+    source_file: olist_sellers_dataset.csv
+    key_columns:
+      - seller_id
+    description: "Seller information and location"
+
+  - name: olist_geolocation_dataset
+    source_file: olist_geolocation_dataset.csv
+    key_columns:
+      - geolocation_zip_code_prefix
+      - geolocation_lat
+      - geolocation_lng
+    description: "Geographic coordinates for zip code prefixes"
+
+  - name: product_category_name_translation
+    source_file: product_category_name_translation.csv
+    key_columns:
+      - product_category_name
+    description: "Portuguese to English category name translations"

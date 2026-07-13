@@ -1,0 +1,18 @@
+version: 2
+
+seeds:
+  - name: brazil_states
+    description: >
+      Reference data for 27 Brazilian states including state code, 
+      full name, macro-region, and capital city. Loaded via `dbt seed`.
+    columns:
+      - name: state_code
+        description: "2-letter state abbreviation (Primary Key)"
+        tests:
+          - unique
+          - not_null
+      - name: region
+        description: "Macro-region of Brazil"
+        tests:
+          - accepted_values:
+              values: ['Norte', 'Nordeste', 'Centro-Oeste', 'Sudeste', 'Sul']

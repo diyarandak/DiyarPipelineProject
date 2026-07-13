@@ -1,0 +1,28 @@
+state_code,state_name,region,capital
+AC,Acre,Norte,Rio Branco
+AL,Alagoas,Nordeste,Maceió
+AM,Amazonas,Norte,Manaus
+AP,Amapá,Norte,Macapá
+BA,Bahia,Nordeste,Salvador
+CE,Ceará,Nordeste,Fortaleza
+DF,Distrito Federal,Centro-Oeste,Brasília
+ES,Espírito Santo,Sudeste,Vitória
+GO,Goiás,Centro-Oeste,Goiânia
+MA,Maranhão,Nordeste,São Luís
+MG,Minas Gerais,Sudeste,Belo Horizonte
+MS,Mato Grosso do Sul,Centro-Oeste,Campo Grande
+MT,Mato Grosso,Centro-Oeste,Cuiabá
+PA,Pará,Norte,Belém
+PB,Paraíba,Nordeste,João Pessoa
+PE,Pernambuco,Nordeste,Recife
+PI,Piauí,Nordeste,Teresina
+PR,Paraná,Sul,Curitiba
+RJ,Rio de Janeiro,Sudeste,Rio de Janeiro
+RN,Rio Grande do Norte,Nordeste,Natal
+RO,Rondônia,Norte,Porto Velho
+RR,Roraima,Norte,Boa Vista
+RS,Rio Grande do Sul,Sul,Porto Alegre
+SC,Santa Catarina,Sul,Florianópolis
+SE,Sergipe,Nordeste,Aracaju
+SP,São Paulo,Sudeste,São Paulo
+TO,Tocantins,Norte,Palmas

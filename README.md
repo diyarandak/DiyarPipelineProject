@@ -1,95 +1,206 @@
-# Big Data Analytics Pipeline — Olist E-Commerce
+# 🚀 Olist Gelişmiş Büyük Veri Boru Hattı (Modern Data Stack)
 
-A hands-on big data project built around the
-[Olist Brazilian E-Commerce public dataset](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) —
-~100,000 real orders from Brazil's largest online marketplace (2016–2018).
+Bu proje, Brezilya E-Ticaret Platformu Olist'e ait gerçek veri seti kullanılarak geliştirilmiş, uçtan uca, kurumsal seviyede bir **Büyük Veri (Big Data) ve Veri Mühendisliği** projesidir.
 
-The project is developed in stages. Each stage adds a new layer to the pipeline. More stages will be added over time.
+Modern Data Stack (Modern Veri Yığını) prensipleri benimsenerek; veriler Data Lake (Veri Gölü) ortamından alınmış, **Medallion Mimarisi** (Bronze, Silver, Gold) kullanılarak işlenmiş ve son kullanıcılar için Apache Superset üzerinde analiz edilebilir **Yıldız Şema (Star Schema)** modeline dönüştürülmüştür. Bütün bu akış Apache Airflow tarafından orkestre edilmektedir.
 
 ---
 
-## 📌 Important Notes
+## 📸 Superset Analitik Dashboard
 
-### Submission
-Each student must **fork or clone this repository**, implement their solution, and submit by **opening a Pull Request (PR) back to this repository** with their completed work. PRs are the only accepted submission method.
+Projemizin çıktısı olan ve otomatik Python API scriptleri ile saniyeler içinde Superset üzerinde ayağa kalkan interaktif Olist Dashboard'undan görüntüler:
 
-### Docker is Optional
-The Docker Compose files and scripts provided in this repo are **starter code only** — a reference setup to help you get up and running quickly. You are **not required** to use Docker. Feel free to run HDFS, Spark, and Superset however you prefer (local install, cloud, a different container setup, etc.), as long as the pipeline works end-to-end.
+![Dashboard 1](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.30.png)
+![Dashboard 2](Dashboards/Ekran%20Resmi%202026-07-13%2000.23.53.png)
+![Dashboard 3](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.12.png)
+![Dashboard 4](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.26.png)
+![Dashboard 5](Dashboards/Ekran%20Resmi%202026-07-13%2000.24.39.png)
 
 ---
 
-## Architecture (Phase 1)
+## 🏛️ Mimari Tasarım (Medallion Architecture)
 
+Proje, veriyi ham halinden en değerli analitik haline kadar katman katman işleyen Medallion yaklaşımını kullanmaktadır:
+
+```mermaid
+graph LR
+    subgraph EL ["Extract & Load (EL)"]
+        CSV[("Kaggle Ham CSV")] -->|PySpark Ingestion| Bronze[("Bronze Katman\nIceberg / Parquet")]
+    end
+    
+    subgraph T ["Transform (T) - dbt"]
+        Bronze -->|dbt Staging Deduplication| Silver[("Silver Katman\nTemizlenmiş Veri")]
+        Silver -->|dbt Models| Gold[("Gold Katman\nYıldız Şema")]
+    end
+    
+    subgraph Serve ["Serve & Analyze"]
+        Gold -->|Apache Doris| BI["Apache Superset\nDashboard API"]
+    end
+    
+    Airflow(("Apache Airflow")) -.->|PySpark Tetikler| Bronze
+    Airflow -.->|dbt Orkestre Eder| Silver
 ```
-[Olist Dataset — 9 CSV Tables]
-        |
-        v
-[Apache Spark]
-  · Reads CSVs
-  · Writes Parquet
-        |
-        v
-[HDFS or MinIO]
-        |
-        v
-[Apache Superset — Simple Charts]
+
+| Katman | Araç | Görev |
+| :--- | :--- | :--- |
+| 🥉 **Bronze (Ham)** | PySpark | Dış kaynaktaki veriyi hiçbir değişikliğe uğratmadan veri gölüne (Apache Iceberg) yazar. |
+| 🥈 **Silver (Staging)** | dbt | Veri tiplerini düzeltir, **SELECT DISTINCT** mantığıyla mükerrer kayıtları temizler, NULL kayıtları süzer ve standartlaştırır. |
+| 🥇 **Gold (Marts)** | dbt | Temizlenmiş verileri Star Schema yapısında birleştirerek iş birimine hazır Fact ve Dimension tabloları oluşturur. |
+
+---
+
+## 🌟 Veri Modelleme (Star Schema)
+
+Analitik sorguların inanılmaz hızlı çalışması ve raporlama araçlarının (Superset vb.) rahat okuyabilmesi için **Gold** katmanımız Yıldız Şema yapısında tasarlanmıştır. Ciro hesaplamalarında **Ürün Fiyatı + Kargo (Freight)** hesaba katılarak tam kapsamlı Gross Merchandise Value (GMV) elde edilmiştir.
+
+```mermaid
+erDiagram
+    fact_orders {
+        string order_id PK
+        string customer_key FK
+        date order_date_key FK
+        decimal total_order_value
+        string delivery_status
+    }
+    
+    fact_order_items {
+        string order_item_surrogate_key PK
+        string order_id FK
+        string product_key FK
+        string seller_key FK
+        decimal price
+        decimal freight_value
+    }
+    
+    fact_seller_performance {
+        string seller_key PK
+        int total_orders_fulfilled
+        int total_products_sold
+        decimal total_revenue
+        decimal avg_review_score
+    }
+
+    dim_customers {
+        string customer_key PK
+        string customer_city
+        string customer_region
+    }
+    
+    dim_sellers {
+        string seller_key PK
+        string seller_city
+        string seller_region
+    }
+
+    dim_products {
+        string product_key PK
+        string product_category
+        string product_size_category
+    }
+
+    dim_date {
+        date date_key PK
+        int year
+        int quarter
+        string month_name_pt
+    }
+    
+    dim_geography {
+        string zip_code_prefix PK
+        string city
+        string state
+    }
+    
+    dim_payment_type {
+        string payment_type_key PK
+        string payment_type_name
+    }
+
+    %% Relationships
+    fact_orders }o--|| dim_customers : "Satın alır"
+    fact_orders }o--|| dim_date : "Sipariş verilir"
+    
+    fact_order_items }o--|| fact_orders : "Aittir"
+    fact_order_items }o--|| dim_products : "İçerir"
+    fact_order_items }o--|| dim_sellers : "Satılır"
+    
+    fact_seller_performance ||--|| dim_sellers : "Performans"
+    dim_customers }o--|| dim_geography : "Bulunur"
+    dim_sellers }o--|| dim_geography : "Bulunur"
 ```
 
 ---
 
+## 🛠️ Kullanılan Teknolojiler
 
-## Phases
-
-### ✅ Phase 1 — Ingest & Visualize
-
-> **Current task**
-
-- Download the Olist dataset (9 CSV tables).
-- Import all CSVs into **HDFS or MinIO** in **Parquet format** using Apache Spark.
-- Connect Apache Superset to the stored data and create a few simple charts/diagrams.
-
-No advanced transformations are required for this phase.
+*   **Veri Çıkarma (Ingestion):** PySpark (Büyük boyutlu verileri hızlıca Iceberg tablosu yapar)
+*   **Veritabanı / Veri Ambarı:** Apache Doris (Aşırı hızlı, modern OLAP motoru)
+*   **Veri Dönüştürme:** dbt (Data Build Tool - SQL ile test, dönüşüm, mükerrer veri engelleme)
+*   **Orkestrasyon:** Apache Airflow & Astronomer Cosmos (Hata bildirimli gelişmiş DAG zincirleri)
+*   **Veri Görselleştirme:** Apache Superset (Python API ile tam otomatik Dashboard Kurulumu)
 
 ---
 
-### 🔜 Phase 2 — Coming Soon
+## ✨ Projenin Kurumsal (Enterprise) Özellikleri
 
-Details will be announced.
+*   **Otomatik Dashboard Üretimi:** `visualization/create_dashboard.py` üzerinden Superset REST API kullanılarak tüm tablo kayıtları, veri setleri ve 10 farklı grafik otomatik oluşturulur.
+*   **Deduplication (Veri Tekilleştirme):** Ingestion süreçlerinde yaşanabilecek tekrar yüklemeler (Data Duplication) dbt katmanında `DISTINCT` mekanizması ve `_ingested_at` kolon filtresiyle önlenir.
+*   **Gelişmiş Metric'ler:** Treemap, Sunburst ve Coğrafi dağılım grafiklerinde Superset'in en modern ECharts bileşenleri (`treemap_v2`, `sunburst_v2` vb.) kullanıldı.
+*   **dbt Macros & Seeds:** Tekrar eden SQL kodlarının modüler (DRY) yapılması ve Brezilya eyalet gibi referans verilerin statik CSV olarak sisteme alınması.
+*   **SQL Linter:** Kod bütünlüğünü sağlamak için `SQLFluff` konfigürasyonu.
 
 ---
 
-## Docker Quick Start (Optional)
+## 📂 Dosya ve Klasör Hiyerarşisi
 
-The following commands use the provided Docker Compose files as a starting point.
+Aşağıda projenin temiz ve modüler dosya ağacını görebilirsiniz:
 
-**1. Create the shared network**
+```text
+AdvancedBigDataPipeline/
+├── Makefile                        # Tüm kurulum ve çalıştırma komutlarının bulunduğu merkezi araç
+├── README.md                       # Proje dokümantasyonu (Bu dosya)
+├── Dashboards/                     # Superset üzerinden alınan rapor ekran görüntüleri
+├── airflow/                        # Airflow DAG'leri ve Astronomer konfigürasyonları
+│   └── dags/
+├── config/                         # Veritabanı, Spark ve diğer servis bağlantı ayarları
+├── data/                           # Kaggle'dan indirilen Olist CSV dosyaları
+├── docker/                         # Docker Compose YAML dosyaları (Doris, Superset, Airflow vb.)
+├── olist_dbt/                      # dbt veri dönüşüm projesi
+│   ├── dbt_project.yml
+│   ├── macros/                     # SQL makroları (örn: get_brazil_region)
+│   ├── models/
+│   │   ├── staging/                # Silver katman (Veri temizleme ve tekilleştirme)
+│   │   └── marts/                  # Gold katman (Fact ve Dimension tabloları)
+│   ├── seeds/                      # Referans verileri (brazil_states.csv)
+│   └── tests/                      # Veri doğrulama testleri
+├── processing/                     # PySpark veri içe aktarma scriptleri (Bronze Ingestion)
+├── scripts/                        # Otomasyon scriptleri (Veri indirme, ağ kurma vb.)
+└── visualization/                  # Superset API otomasyon klasörü
+    ├── cleanup.py                  # Eski dashboard'ları temizler
+    ├── create_dashboard.py         # Grafikleri ve Dashboard'u sıfırdan kurar
+    └── register_tables.py          # Veritabanı tablolarını Superset datasetlerine çevirir
+```
 
+---
+
+## 🚀 Projeyi Çalıştırma (Kurulum)
+
+### 1. Servisleri Başlatma
+Tüm altyapı (Hadoop, Doris, Airflow, Superset) Docker üzerinde çalışır:
 ```bash
-# Linux / macOS
-bash scripts/setup_network.sh
-
-# Windows (PowerShell)
-.\scripts\setup_network.ps1
+make setup
 ```
 
-**2. Start the services**
-
+### 2. Veri Boru Hattını (Pipeline) Tetikleme
+PySpark veriyi göle indirir ve dbt tüm dönüşüm/test süreçlerini çalıştırır:
 ```bash
-docker compose -f docker/docker-compose-hdfs.yml up -d
-docker compose -f docker/docker-compose-spark.yml up -d
-docker compose -f docker/docker-compose-superset.yml up -d
+make download
+make pipeline
 ```
 
-| Service         | URL                       | Credentials   |
-|-----------------|---------------------------|---------------|
-| HDFS NameNode   | http://localhost:9870     |               |
-| Spark Master    | http://localhost:8080     |               |
-| Superset        | http://localhost:8088     | admin / admin |
-
-**3. Stop everything**
-
+### 3. Superset (Dashboardlar)
+Raporları ve panelleri oluşturmak için:
 ```bash
-docker compose -f docker/docker-compose-superset.yml down
-docker compose -f docker/docker-compose-spark.yml down
-docker compose -f docker/docker-compose-hdfs.yml down
+make dashboard
 ```
+Erişim: `http://localhost:8088` (admin/admin).

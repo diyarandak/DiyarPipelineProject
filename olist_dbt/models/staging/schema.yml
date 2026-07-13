@@ -1,0 +1,130 @@
+version: 2
+
+models:
+  - name: stg_customers
+    description: "Cleansed customer data. One row per customer_id (order-level granularity)."
+    columns:
+      - name: customer_id
+        description: "Primary key — unique per order"
+        tests:
+          - unique
+          - not_null
+      - name: customer_unique_id
+        description: "Unique customer identifier across all orders"
+        tests:
+          - not_null
+      - name: customer_state
+        description: "2-letter Brazilian state code"
+        tests:
+          - not_null
+
+  - name: stg_orders
+    description: "Cleansed order headers with standardized timestamps."
+    columns:
+      - name: order_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: customer_id
+        description: "FK to stg_customers"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customers')
+              field: customer_id
+      - name: order_status
+        description: "Current status of the order"
+        tests:
+          - accepted_values:
+              values: ['created', 'approved', 'invoiced', 'processing', 'shipped', 'delivered', 'unavailable', 'canceled']
+
+  - name: stg_order_items
+    description: "Cleansed order line items with derived total_item_value."
+    columns:
+      - name: order_id
+        description: "FK to stg_orders"
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_orders')
+              field: order_id
+      - name: product_id
+        description: "FK to stg_products"
+        tests:
+          - not_null
+      - name: seller_id
+        description: "FK to stg_sellers"
+        tests:
+          - not_null
+      - name: price
+        description: "Item price in BRL"
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 100000
+
+  - name: stg_order_payments
+    description: "Cleansed payment records. Multiple payments per order possible."
+    columns:
+      - name: order_id
+        description: "FK to stg_orders"
+        tests:
+          - not_null
+      - name: payment_type
+        description: "Payment method used"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['credit_card', 'boleto', 'voucher', 'debit_card', 'not_defined']
+      - name: payment_value
+        description: "Payment amount in BRL"
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 500000
+
+  - name: stg_order_reviews
+    description: "Cleansed customer reviews with response time calculation."
+    columns:
+      - name: review_id
+        description: "Primary key"
+        tests:
+          - not_null
+      - name: order_id
+        description: "FK to stg_orders"
+        tests:
+          - not_null
+      - name: review_score
+        description: "Customer satisfaction score (1-5)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5]
+
+  - name: stg_products
+    description: "Cleansed product catalog with English category names and volume calculation."
+    columns:
+      - name: product_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: product_category
+        description: "Product category name in English"
+        tests:
+          - not_null
+
+  - name: stg_sellers
+    description: "Cleansed seller data."
+    columns:
+      - name: seller_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      - name: seller_state
+        description: "2-letter Brazilian state code"
+        tests:
+          - not_null
