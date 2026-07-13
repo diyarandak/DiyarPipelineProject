@@ -1,7 +1,7 @@
 olist_dbt:
   outputs:
     dev:
-      type: doris
+      type: mysql
       host: doris-fe
       port: 9030
       schema: olist

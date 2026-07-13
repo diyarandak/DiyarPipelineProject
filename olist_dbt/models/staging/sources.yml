@@ -2,7 +2,9 @@ version: 2
 
 sources:
   - name: bronze
-    database: hdfs_catalog.bronze
+    schema: hdfs_catalog.bronze
+    quoting:
+      schema: false
     description: "Raw Olist datasets loaded into HDFS by PySpark as Parquet files"
     tables:
       - name: customers

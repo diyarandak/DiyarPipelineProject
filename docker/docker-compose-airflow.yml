@@ -21,6 +21,7 @@ x-airflow-common:
     - ../airflow/plugins:/opt/airflow/plugins
     - ../processing:/opt/airflow/processing
     - ../config:/opt/airflow/config
+    - ../olist_dbt:/opt/airflow/olist_dbt
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on:
     postgres:
