@@ -4,11 +4,6 @@ Bu proje, Brezilya E-Ticaret Platformu Olist'e ait gerçek veri seti kullanılar
 
 ---
 
-## 🧠 AI Sunum Üreticisi İçin Kılavuz (Prompt Context)
-Bu döküman, yapay zeka araçlarının (ChatGPT, Claude vb.) bu projeden profesyonel bir PowerPoint (.pptx) sunumu hazırlayabilmesi için özel olarak son derece detaylı yazılmıştır. Sunum hazırlarken lütfen aşağıdaki 9 adımı slaytlara bölerek, mimari karşılaştırmaları (Avantaj/Dezavantaj) vurgulayarak ve mühendislik terimlerini (ELT, OLAP, SCD Type 2, DAG) ön plana çıkararak tasarlayın.
-
----
-
 ## 🏛️ Mimari Tasarım (Medallion Architecture)
 
 Proje, veriyi ham halinden en değerli analitik haline kadar katman katman işleyen Medallion yaklaşımını kullanmaktadır:
